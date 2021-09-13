@@ -1,9 +1,220 @@
 <html>
-<head>
-</head>
-
 <body>
-
 </body>
+<script>
+function token(str){
+  var len = str.length;
+  
+  return function(target, pos, result){
+    result.newpos = pos;
+    result.str = [];
+    
+    if (target.substr(pos, len) === str){
+      result.newpos = pos + len;
+      result.str.push(str);
+      return true;
+    } else {
+      return false;
+    }
+  };
+}
+function many(parser){
+  return function(target, pos, result){
+    result.newpos = pos;
+    result.str = [];
+    
+    while(true){
+      var rslt = [];
+      if (parser(target, result.newpos, rslt)){
+        result.newpos = rslt.newpos;
+        result.str = result.str.concat(rslt.str);
+      } else {
+        break;
+      }
+    }
+    return true;
+  }
+}
+function choice(){
+  var parsers = arguments;
+  
+  return function(target, pos, result){
+    for (var i = 0; i < parsers.length; i++) {
+      var rslt = {};
+      var ret = parsers[i](target, pos, rslt);
+      if (ret) {
+        result.newpos = rslt.newpos;
+        result.str = rslt.str;
+        return ret;
+      }
+    }
+    return false;
+  }
+}
+function seq(){
+  var parsers = arguments;
+  
+  return function(target, pos, result){
+    result.newpos = pos;
+    result.str = [];
+    
+    for (var i = 0; i < parsers.length; i++) {
+      var rslt = {};
+      var ret = parsers[i](target, result.newpos, rslt);
+      if (ret) {
+        result.newpos = rslt.newpos;
+        result.str = result.str.concat(rslt.str);
+      } else {
+        result.newpos = pos;
+        result.str = [];
+        return false;
+      }
+    }
+    return true;
+  };
+}
+function option(parser){
+  return function(target, pos, result){
+    result.newpos = pos;
+    result.str = [];
+    
+    var rslt = {};
+    if (parser(target, pos, rslt)){
+      result.newpos = rslt.newpos;
+      result.str = result.str.concat(rslt.str);
+    }
+    return true;
+  };
+}
+function regex(re){
+  if (re.source.substring(0, 1) !== '^') {
+    // RegExpオブジェクトを作り直す
+    re = new RegExp('^' + re.source, (re.global ? 'g' : '') + (re.ignoreCase ? 'i' : '') + (re.multiline ? 'm' : ''));
+  }
 
+  return function(target, pos, result){
+    result.newpos = pos;
+    result.str = [];
+    
+    re.lastIndex = 0;
+    var ret = re.exec(target.slice(pos));
+    if (ret){
+      result.newpos = pos + ret[0].length;
+      result.str.push(ret[0]);
+      return true;
+    } else {
+      return false;
+    }
+  };
+}
+function lazy(callback) {
+  var parser;
+  
+  return function(target, pos, result) {
+    if (!parser) {
+      parser = callback();
+    }
+    return parser(target, pos, result);
+  };
+}
+function map(parser, fn){
+  return function(target, pos, result){
+    result.newpos = pos;
+    result.str = [];
+    
+    var rslt = {};
+    if (parser(target, pos, rslt)){
+      result.newpos = rslt.newpos;
+      result.str = result.str.concat(rslt.str);
+      result.str.map((e, i) =>{ result.str[i] = fn(e);});
+      return true;
+    } else {
+      return false;
+    }
+  };
+}
+function char(chars){
+  var dict = {};
+  chars.split('').map(c => { dict[c] = c; });
+  
+  return function(target, pos, result){
+    result.newpos = pos;
+    result.str = [];
+    
+    var ch = target.substr(pos, 1);
+    if (dict[ch]){
+      result.newpos += 1;
+      result.str.push(ch);
+      return true;
+    } else {
+      return false;
+    }
+  };
+}
+
+//-------------------------------------------------------------------------------
+
+function textParser_test(){
+/*  var fooParser = seq(token("baz"),
+                      many(choice(token("bar"), token("foo"))),
+                      option(token("X")),
+                      seq(option(token("+")),
+                          many(token("-")))
+                     );*/
+//  var fooParser = regex(/[abz]*[0-9]?f+/);
+//  var fooParser = many(choice(token("foo"), token("bar"), token("baz")));
+  var lazyParser = option(seq(choice(token("foo"), token("bar"), token("baz")), lazy(function(){
+                         return lazyParser; })));
+  var fooParser = map(lazyParser, function(result){
+    console.log("parsed.");
+    for (var i = 0; i < result.length; i++){
+      console.log("  " + i + " : " + result[i]);
+    }
+    return result;
+  });
+//  var fooParser = many(char("abcz"));
+
+  var result = {};
+  var ret = fooParser("abazfoobarX--", 1, result);
+  console.log(ret + " : "); console.log(result);
+}
+
+function calc_test(){
+
+  var number = map(regex(/\d+/), function(parsed) {
+    // パースした文字列を整数に変換する
+    return parseInt(parsed, 10);
+  });
+  var operator = char("+-");
+  
+  var parenthesis = lazy(function() {
+    var parser = seq(token('('), expression, token(')'));
+    return map(parser, function(parsed) {
+      // 括弧の文字列はいらないので中の数式のパース結果だけを取り出す
+      return parsed;
+    });
+  });
+  var atom = choice(number, parenthesis);
+
+  
+  var result = {};
+  var ret = number("00", 0, result);
+  console.log(ret + " : "); console.log(result);
+  
+}
+
+//-------------------------------------------------------------------------------
+
+window.onload = function(){
+  console.log("-- script start --\n");
+  
+  //textParser_test();
+  
+  calc_test();
+  
+  
+  console.log("-- script end --\n");
+};
+
+</script>
 </html>
