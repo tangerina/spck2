@@ -295,52 +295,87 @@ function MMLScore(target, pos){
 }
 // パーサの結果は、 parsed, newpos, type, val
 function MMLCommand(target, pos){
-  var parsed = false, stmt, arg;
+  var parsed = false, s, a;
   var np = pos;
   
-  stmt = MMLStatement(target, np);
+  var stmt = MMLStatement(target, np);
   if (stmt.parsed){
-    arg = MMLArgument(target, stmt.newpos);
+    //引数が必要な場合、処理する
+    var arg = MMLArgument(target, stmt.newpos);
+    //引数がステートメントに対して正しいか
     np = arg.newpos;
+    s = stmt.val;
+    a = arg.val;
     parsed = true;
   }
   
-  return {parsed:parsed, newpos: np, type: stmt.val, result: arg.val};
+  return {parsed:parsed, newpos:np, type:s, val:a};
+}
+function term(target, pos){
+  var t = {parsed:false, newpos:pos, type:null, val:null};
+  setpos(pos);
+  
+  while(isws(getch())){
+    nextch();
+  }
+
+  if (isdigit(getch())){
+    var num = getInt();
+    t.parsed = true;
+    t.type = "Number"; t.val = num;
+  } else if (istoneno(getch())){
+    t.parsed = true;
+    t.type = "@"; t.val = getch();
+    nextch();
+  } else if (istempo(getch())){
+    t.parsed = true; 
+    t.type = "t"; t.val = getch();
+    nextch();
+  }
+  t.newpos = getpos();
+  
+  return t;
 }
 function MMLStatement(target, pos){
   var parsed = false;
   var np = pos;
   
-  var term = term(target, pos);
-  if (term.parsed){
+  var t = term(target, pos);
+  if (t.parsed){
     parsed = true;
-    np = term.newpos;
+    np = t.newpos;
   }
-  return {parsed:parsed, newpos:np, type:term.type, val: term.val};
+  return {parsed:parsed, newpos:np, type:t.type, val: t.val};
 }
 function MMLArgument(target, pos){
   var parsed = false;
   var np = pos;
 
-  var arg = term(target, pos);
-  if (arg.parsed){
+  var t = term(target, pos);
+  if (t.parsed){
+    //末端の要素ならば正しい
     parsed = true;
-    np = arg.newpos;
+    np = t.newpos;
   }
-  return {parsed:parsed, newpos:np, type:term.type, val: term.val};
+  return {parsed:parsed, newpos:np, type:t.type, val:t.val};
 }
 
     
 function parse(mml) {
   var commands = [];
-  target = target.toLowerCase();
+  /*target = target.toLowerCase();
   
   setpos(0);
   while(getch()){
     var c = getCmd();
     if (!c)　break;
     commands.push(c);
-  }
+  }*/
+  
+  target = "@3 t120";
+  commands = MMLScore(target, 0);
+  console.log(commands);
+  //commands.map(c=>{console.log(c);});
   
   return commands;
 };
@@ -364,7 +399,7 @@ function test01_read(){
 
   var m = new MMLTrack2();
   var cmds = m.parse(target);
-  cmds.map(c=>{console.log(c);});
+  //cmds.map(c=>{console.log(c);});
   
   console.log("test01 end.");
 }
