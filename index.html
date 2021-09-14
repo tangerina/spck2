@@ -13,7 +13,6 @@
   <button id="btnTest">test</button>
 </body>
 <script>
-
 var target = "";
 
 var p = 0;
@@ -275,6 +274,62 @@ function getCmd(){
   return cmd;
 }
 
+function MMLScore(target, pos){
+  var cmds = [];
+  
+  var cmd = MMLCommand(target, pos);
+  while (cmd.parsed) {
+    switch (cmd.type) {
+    case "@":
+    case "t":
+      //get_token();
+      //val -= term();
+      cmds.push({name:cmd.type, val:cmd.val, note: null, ksig:null, len:null, dot:null, broken:null});
+      break;
+    default:
+      break;
+    }
+    cmd = MMLCommand(target, cmd.newpos);
+  }
+  return cmds;
+}
+// パーサの結果は、 parsed, newpos, type, val
+function MMLCommand(target, pos){
+  var parsed = false, stmt, arg;
+  var np = pos;
+  
+  stmt = MMLStatement(target, np);
+  if (stmt.parsed){
+    arg = MMLArgument(target, stmt.newpos);
+    np = arg.newpos;
+    parsed = true;
+  }
+  
+  return {parsed:parsed, newpos: np, type: stmt.val, result: arg.val};
+}
+function MMLStatement(target, pos){
+  var parsed = false;
+  var np = pos;
+  
+  var term = term(target, pos);
+  if (term.parsed){
+    parsed = true;
+    np = term.newpos;
+  }
+  return {parsed:parsed, newpos:np, type:term.type, val: term.val};
+}
+function MMLArgument(target, pos){
+  var parsed = false;
+  var np = pos;
+
+  var arg = term(target, pos);
+  if (arg.parsed){
+    parsed = true;
+    np = arg.newpos;
+  }
+  return {parsed:parsed, newpos:np, type:term.type, val: term.val};
+}
+
 function parse(mml) {
   var commands = [];
   target = target.toLowerCase();
@@ -289,20 +344,26 @@ function parse(mml) {
   return commands;
 };
 
-function test01_read(){
-  console.log("test01 start.("+target+")");
-  /*initpos();
-  nextch();
-  while(getch()){
-   // getToken();
-   console.log(getch() + isws(getch()));
-   nextch();
-  }*/
 
-  var cmds = parse(target);
+var MMLTrack2 = function() {
+};
+
+MMLTrack2.prototype.parse = function (mml) {
+  var commands = [];
+  var checked = {};
+  var m, cmd, mask;
+
+  commands = parse(mml);
+  
+  return commands;
+};
+
+function test01_read(){
+  console.log("test01 start.");
+
+  var m = new MMLTrack2();
+  var cmds = m.parse(target);
   cmds.map(c=>{console.log(c);});
-  //target=",";
-  //console.log(iscomma(target));
   
   console.log("test01 end.");
 }
@@ -310,6 +371,7 @@ document.getElementById("btnTest").onclick = function(e){
   target = document.getElementById("taTest").value;
   test01_read();
 };
+
 
 </script>
 
