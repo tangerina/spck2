@@ -1,0 +1,5 @@
+MML
+<https://art-of-life.jp/posts/automaton-and-formal-language/>
+
+AudioWorklet
+<https://art-of-life.jp/posts/audio-worklet/>
