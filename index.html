@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title></title>
+</head>
+<body>
+<textarea id="taTest" style="width:300px;height:200px;">
+@1 t120 v128 o4 L4 ['C8.D-16'2,16]<E+2
+</textarea><br>
+  <button id="btnTest">test</button>
+</body>
+<script>
+
+var target = "";
+
+var p = 0;
+var ch = "";
+
+var PITCH = {">" : +1, "<" : -1};
+var KSIG = {"+" : +1, "-" : -1};
+
+function getpos(){ return p; }
+function setpos(_p){ p = _p; }
+function nextch(){
+  p += (p < target.length) ? 1 : 0;
+}
+function getch(){
+  return (p < target.length) ? target[p] : null;
+}
+function isws(c){ // check if the character is whitespace
+  return (!(/\S/).exec(c));
+}
+function isdigit(c){
+  return (/\d/).exec(c);
+}
+function isnote(c){
+  return (/[abcdefg]/i).exec(c);
+}
+function isrest(c){
+  return (/r/i).exec(c);
+}
+function isksig(c){
+  return (/[+-]/).exec(c);
+}
+function istrackno(c){
+  return (/#/).exec(c);
+}
+function istoneno(c){
+  return (/@/).exec(c);
+}
+function isoctave(c){
+  return (/O/i).exec(c);
+}
+function isoctupdown(c){
+  return (/[\<\>]/).exec(c);
+}
+function isrepeat(c){
+  return (/[\[\]]/).exec(c);
+}
+function ischord(c){
+  return (/'/).exec(c);
+}
+function istempo(c){
+  return (/T/i).exec(c);
+}
+function isvolume(c){
+  return (/V/i).exec(c);
+}
+function islength(c){
+  return !(/(null)/).exec(c) && (/L/i).exec(c);
+}
+function iscomma(c){
+  return (/,/).exec(c);
+}
+function isdot(c){
+  return (/\./).exec(c);
+}
+function getdots(){
+  var buf = "";
+  while (isdot(getch())){
+    buf = buf + getch();
+    nextch();
+  }
+  return buf.length;
+}
+function getInt(){
+  var buf = "";
+  while(isdigit(getch())){
+    buf = buf + getch();
+    nextch();
+  }
+  return Number(buf);
+}
+
+function getToken(){
+  var token = null;
+  
+  while(isws(getch())){
+    nextch();
+  }
+
+  if (isdigit(getch())){
+    var num = getInt();
+    token = {name:"Number", val:num};
+  } else if (istrackno(getch())){
+    token = {name:"TrackNo", val:getch()};
+    nextch();
+  } else if (istoneno(getch())){
+    token = {name:"ToneNo", val:getch()};
+    nextch();
+  } else if (istempo(getch())){
+    token = {name:"Tempo", val:getch()};
+    nextch();
+  } else if (isvolume(getch())){
+    token = {name:"Volume", val:getch()};
+    nextch();
+ } else if (isoctave(getch())){
+    token = {name:"Octave", val:getch()};
+    nextch();
+  } else if (isoctupdown(getch())){
+    token = {name:"OctUD", val:getch()};
+    nextch();
+  } else if (isrepeat(getch())){
+    token = {name:"Repeat", val:getch()};
+    nextch();
+  } else if (ischord(getch())){
+    token = {name:"Chord", val:getch()};
+    nextch();
+  } else if (islength(getch())){
+    token = {name:"Length", val:getch()};
+    nextch();
+  } else if (isksig(getch())){
+    token = {name:"Ksig", val:getch()};
+    nextch();
+  } else if (isnote(getch())){
+    token = {name:"Note", val:getch()};
+    nextch();
+  } else if (isrest(getch())){
+    token = {name:"Rest", val:getch()};
+    nextch();
+  } else if (isdot(getch())){
+    var dots = getdots();
+    token = {name:"Dot", val:dots};
+  } else if (iscomma(getch())){
+    token = {name:"Comma", val:getch()};
+    nextch();
+  } else if (getch()){
+    token = {name:"Other", val:getch()};
+    nextch();
+  }
+
+  return token;
+}
+
+var inchord = 0;
+
+function getCmd(){
+  var cmd = null;
+  var token = getToken();
+  if (token){
+    switch(token.name){
+    case "ToneNo":
+      var t = getToken();
+      if (t.name != "Number"){
+        console.log("syntax error");
+        return null;}
+      cmd = {name:token.val, val:t.val};
+      break;
+    case "Tempo":
+      var t = getToken();
+      if (t.name != "Number"){
+        console.log("syntax error");
+        return null;}
+      cmd = {name:token.val, val:t.val};
+      break;
+    case "Volume":
+      var t = getToken();
+      if (t.name != "Number"){
+        console.log("syntax error");
+        return null;}
+      cmd = {name:token.val, val:t.val};
+      break;
+    case "Octave":
+      var t = getToken();
+      if (t.name != "Number"){
+        console.log("syntax error");
+        return null;}
+      cmd = {name:token.val, val:t.val};
+      break;
+    case "OctUD":
+      cmd = {name:token.val};
+      break;
+    case "Repeat":
+      var cnt = 0;
+      if (token.val == "]"){
+        var curpos = getpos();
+        var t = getToken();
+        if (t && t.name == "Number"){
+          cnt = t.val;
+          curpos = getpos();
+        }
+        setpos(curpos);
+      }
+      cmd = {name:token.val, val:cnt};
+      break;
+    case "Chord":
+      var sqbrckt, len, dot, broken;
+      if (inchord){
+        sqbrckt = "chord_end";
+        var curpos = getpos();
+        var t = getToken();
+        if (t && t.name == "Number"){
+          len = t.val;
+          curpos = getpos();
+          t = getToken();
+        }
+        if (t && t.name == "Dot"){
+          dot = t.val;
+          curpos = getpos();
+          t = getToken();
+        }
+        if (t && t.name == "Comma"){
+          t = getToken();
+          if (t && t.name == "Number"){
+            broken = t.val;
+            curpos = getpos();
+          }
+        }
+        setpos(curpos);
+      } else {
+        sqbrckt = "chord_begin";
+      }
+      inchord = 1 - inchord;
+      cmd = {name:sqbrckt, len:len, dot:dot, broken:broken};
+      break;
+    case "Length":
+      var t = getToken();
+      if (t.name != "Number"){
+        console.log("syntax error");
+        return null;}
+      cmd = {name:token.val, val:t.val};
+      break;
+    case "Note":
+    case "Rest":
+      console.log('case Note in');
+      var note, len, dot, ksig;
+      note = token.val;
+      var curpos = getpos();
+      var t = getToken();
+      if (t && t.name == "Ksig"){
+        ksig = t.val;
+        curpos = getpos();
+        t = getToken();
+      }
+      if (t && t.name == "Number"){
+        len = t.val;
+        curpos = getpos();
+        t = getToken();
+      }
+      if (t && t.name == "Dot"){
+        dot = t.val;
+        curpos = getpos();
+      }
+      setpos(curpos);
+      cmd = {name:token.name, note:note,
+        len:len, dot:dot, ksig:ksig};
+      console.log('case Note out, ' + getpos());
+      break;
+    }
+  }
+  
+  return cmd;
+}
+
+function parse(mml) {
+  var commands = [];
+  target = target.toLowerCase();
+  
+  setpos(0);
+  while(getch()){
+    var c = getCmd();
+    if (!c)　break;
+    commands.push(c);
+  }
+  
+  return commands;
+};
+
+function test01_read(){
+  console.log("test01 start.("+target+")");
+  /*initpos();
+  nextch();
+  while(getch()){
+   // getToken();
+   console.log(getch() + isws(getch()));
+   nextch();
+  }*/
+
+  var cmds = parse(target);
+  cmds.map(c=>{console.log(c);});
+  //target=",";
+  //console.log(iscomma(target));
+  
+  console.log("test01 end.");
+}
+document.getElementById("btnTest").onclick = function(e){
+  target = document.getElementById("taTest").value;
+  test01_read();
+};
+
+</script>
+
+
+</html>
