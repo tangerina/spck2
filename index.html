@@ -15,352 +15,77 @@
 <script>
 var target = "";
 
-var p = 0;
-var ch = "";
-
 var PITCH = {">" : +1, "<" : -1};
 var KSIG = {"+" : +1, "-" : -1};
 
-function getpos(){ return p; }
-function setpos(_p){ p = _p; }
-function nextch(){
-  p += (p < target.length) ? 1 : 0;
-}
-function getch(){
-  return (p < target.length) ? target[p] : null;
+function getch(str, pos){
+  return (pos < str.length) ? str[pos] : null;
 }
 function isws(c){ // check if the character is whitespace
   return (!(/\S/).exec(c));
 }
 function isdigit(c){
-  return (/\d/).exec(c);
+  return "1234567890".indexOf(c) >= 0;
 }
-function isnote(c){
-  return (/[abcdefg]/i).exec(c);
-}
-function isrest(c){
-  return (/r/i).exec(c);
-}
-function isksig(c){
-  return (/[+-]/).exec(c);
-}
-function istrackno(c){
-  return (/#/).exec(c);
-}
-function istoneno(c){
-  return (/@/).exec(c);
-}
-function isoctave(c){
-  return (/O/i).exec(c);
-}
-function isoctupdown(c){
-  return (/[\<\>]/).exec(c);
-}
-function isrepeat(c){
-  return (/[\[\]]/).exec(c);
-}
-function ischord(c){
-  return (/'/).exec(c);
-}
-function istempo(c){
-  return (/T/i).exec(c);
-}
-function isvolume(c){
-  return (/V/i).exec(c);
-}
-function islength(c){
-  return !(/(null)/).exec(c) && (/L/i).exec(c);
-}
-function iscomma(c){
-  return (/,/).exec(c);
-}
-function isdot(c){
-  return (/\./).exec(c);
-}
-function getdots(){
+function readint(str, pos){
   var buf = "";
-  while (isdot(getch())){
-    buf = buf + getch();
-    nextch();
+  while(isdigit(getch(str, pos))){
+    buf = buf + getch(str, pos++);
   }
-  return buf.length;
-}
-function getInt(){
-  var buf = "";
-  while(isdigit(getch())){
-    buf = buf + getch();
-    nextch();
-  }
-  return Number(buf);
+  return {val: Number(buf), pos: pos};
 }
 
-function getToken(){
-  var token = null;
+var TOKEN_TYPE = {"@":"ToneNo", "t":"Tempo", "o":"Octave", "l":"Length", "r":"Rest", 
+                  "c":"Note", "d":"Note", "e":"Note", "f":"Note", "g":"Note", "a":"Note", "b":"Note", 
+                  "+":"Sig", "-":"Sig", "\,":"Comma", "[":"SqbrL", "]":"SqbrR", "'":"Chord", 
+                  "1":"Number", "2":"Number", "3":"Number", "4":"Number", "5":"Number", 
+                  "6":"Number", "7":"Number", "8":"Number", "9":"Number", "0":"Number"};
+
+function gettokentype(c){
+  return (c in TOKEN_TYPE) ? TOKEN_TYPE[c] : "Unknown";
+}
+
+function tokenize(str, pos){
+  var token = {type:null, val:null};
   
-  while(isws(getch())){
-    nextch();
-  }
-
-  if (isdigit(getch())){
-    var num = getInt();
-    token = {name:"Number", val:num};
-  } else if (istrackno(getch())){
-    token = {name:"TrackNo", val:getch()};
-    nextch();
-  } else if (istoneno(getch())){
-    token = {name:"ToneNo", val:getch()};
-    nextch();
-  } else if (istempo(getch())){
-    token = {name:"Tempo", val:getch()};
-    nextch();
-  } else if (isvolume(getch())){
-    token = {name:"Volume", val:getch()};
-    nextch();
- } else if (isoctave(getch())){
-    token = {name:"Octave", val:getch()};
-    nextch();
-  } else if (isoctupdown(getch())){
-    token = {name:"OctUD", val:getch()};
-    nextch();
-  } else if (isrepeat(getch())){
-    token = {name:"Repeat", val:getch()};
-    nextch();
-  } else if (ischord(getch())){
-    token = {name:"Chord", val:getch()};
-    nextch();
-  } else if (islength(getch())){
-    token = {name:"Length", val:getch()};
-    nextch();
-  } else if (isksig(getch())){
-    token = {name:"Ksig", val:getch()};
-    nextch();
-  } else if (isnote(getch())){
-    token = {name:"Note", val:getch()};
-    nextch();
-  } else if (isrest(getch())){
-    token = {name:"Rest", val:getch()};
-    nextch();
-  } else if (isdot(getch())){
-    var dots = getdots();
-    token = {name:"Dot", val:dots};
-  } else if (iscomma(getch())){
-    token = {name:"Comma", val:getch()};
-    nextch();
-  } else if (getch()){
-    token = {name:"Other", val:getch()};
-    nextch();
-  }
-
-  return token;
-}
-
-var inchord = 0;
-
-function getCmd(){
-  var cmd = null;
-  var token = getToken();
-  if (token){
-    switch(token.name){
-    case "ToneNo":
-      var t = getToken();
-      if (t.name != "Number"){
-        console.log("syntax error");
-        return null;}
-      cmd = {name:token.val, val:t.val};
-      break;
-    case "Tempo":
-      var t = getToken();
-      if (t.name != "Number"){
-        console.log("syntax error");
-        return null;}
-      cmd = {name:token.val, val:t.val};
-      break;
-    case "Volume":
-      var t = getToken();
-      if (t.name != "Number"){
-        console.log("syntax error");
-        return null;}
-      cmd = {name:token.val, val:t.val};
-      break;
-    case "Octave":
-      var t = getToken();
-      if (t.name != "Number"){
-        console.log("syntax error");
-        return null;}
-      cmd = {name:token.val, val:t.val};
-      break;
-    case "OctUD":
-      cmd = {name:token.val};
-      break;
-    case "Repeat":
-      var cnt = 0;
-      if (token.val == "]"){
-        var curpos = getpos();
-        var t = getToken();
-        if (t && t.name == "Number"){
-          cnt = t.val;
-          curpos = getpos();
-        }
-        setpos(curpos);
-      }
-      cmd = {name:token.val, val:cnt};
-      break;
-    case "Chord":
-      var sqbrckt, len, dot, broken;
-      if (inchord){
-        sqbrckt = "chord_end";
-        var curpos = getpos();
-        var t = getToken();
-        if (t && t.name == "Number"){
-          len = t.val;
-          curpos = getpos();
-          t = getToken();
-        }
-        if (t && t.name == "Dot"){
-          dot = t.val;
-          curpos = getpos();
-          t = getToken();
-        }
-        if (t && t.name == "Comma"){
-          t = getToken();
-          if (t && t.name == "Number"){
-            broken = t.val;
-            curpos = getpos();
-          }
-        }
-        setpos(curpos);
-      } else {
-        sqbrckt = "chord_begin";
-      }
-      inchord = 1 - inchord;
-      cmd = {name:sqbrckt, len:len, dot:dot, broken:broken};
-      break;
-    case "Length":
-      var t = getToken();
-      if (t.name != "Number"){
-        console.log("syntax error");
-        return null;}
-      cmd = {name:token.val, val:t.val};
-      break;
-    case "Note":
-    case "Rest":
-      console.log('case Note in');
-      var note, len, dot, ksig;
-      note = token.val;
-      var curpos = getpos();
-      var t = getToken();
-      if (t && t.name == "Ksig"){
-        ksig = t.val;
-        curpos = getpos();
-        t = getToken();
-      }
-      if (t && t.name == "Number"){
-        len = t.val;
-        curpos = getpos();
-        t = getToken();
-      }
-      if (t && t.name == "Dot"){
-        dot = t.val;
-        curpos = getpos();
-      }
-      setpos(curpos);
-      cmd = {name:token.name, note:note,
-        len:len, dot:dot, ksig:ksig};
-      console.log('case Note out, ' + getpos());
-      break;
+  while(isws(getch(str, pos))){ pos++; }
+  
+  var c = getch(str, pos);
+  if (c) {
+    var type = gettokentype(c);
+    switch(type){
+      case "Number":
+        token.type = type;
+        var result = readint(str, pos);
+        token.val = result.val;
+        pos = result.pos;
+        break;
+      case "ToneNo":
+      case "Tempo":
+      case "Octave":
+      case "Length":
+      case "Sig":
+      case "Comma":
+      case "SqbrL":
+      case "SqbrR":
+      case "Chord":
+      case "Note":
+      case "Rest":
+        token.type = type;
+        token.val = c;
+        pos++;
+        break;
+      default:
+        token.type = type;
+        token.val = c;
+        pos++;
+        console.log("unknown token [" + c + "]");
     }
   }
-  
-  return cmd;
-}
-
-function MMLScore(target, pos){
-  var cmds = [];
-  
-  var cmd = MMLCommand(target, pos);
-  while (cmd.parsed) {
-    switch (cmd.type) {
-    case "@":
-    case "t":
-      //get_token();
-      //val -= term();
-      cmds.push({name:cmd.type, val:cmd.val, note: null, ksig:null, len:null, dot:null, broken:null});
-      break;
-    default:
-      break;
-    }
-    cmd = MMLCommand(target, cmd.newpos);
-  }
-  return cmds;
-}
-// パーサの結果は、 parsed, newpos, type, val
-function MMLCommand(target, pos){
-  var parsed = false, s, a;
-  var np = pos;
-  
-  var stmt = MMLStatement(target, np);
-  if (stmt.parsed){
-    //引数が必要な場合、処理する
-    var arg = MMLArgument(target, stmt.newpos);
-    //引数がステートメントに対して正しいか
-    np = arg.newpos;
-    s = stmt.val;
-    a = arg.val;
-    parsed = true;
-  }
-  
-  return {parsed:parsed, newpos:np, type:s, val:a};
-}
-function term(target, pos){
-  var t = {parsed:false, newpos:pos, type:null, val:null};
-  setpos(pos);
-  
-  while(isws(getch())){
-    nextch();
-  }
-
-  if (isdigit(getch())){
-    var num = getInt();
-    t.parsed = true;
-    t.type = "Number"; t.val = num;
-  } else if (istoneno(getch())){
-    t.parsed = true;
-    t.type = "@"; t.val = getch();
-    nextch();
-  } else if (istempo(getch())){
-    t.parsed = true; 
-    t.type = "t"; t.val = getch();
-    nextch();
-  }
-  t.newpos = getpos();
-  
-  return t;
-}
-function MMLStatement(target, pos){
-  var parsed = false;
-  var np = pos;
-  
-  var t = term(target, pos);
-  if (t.parsed){
-    parsed = true;
-    np = t.newpos;
-  }
-  return {parsed:parsed, newpos:np, type:t.type, val: t.val};
-}
-function MMLArgument(target, pos){
-  var parsed = false;
-  var np = pos;
-
-  var t = term(target, pos);
-  if (t.parsed){
-    //末端の要素ならば正しい
-    parsed = true;
-    np = t.newpos;
-  }
-  return {parsed:parsed, newpos:np, type:t.type, val:t.val};
-}
-
     
+  return {token:token, pos:pos};
+}
+
 function parse(mml) {
   var commands = [];
   /*target = target.toLowerCase();
@@ -371,11 +96,19 @@ function parse(mml) {
     if (!c)　break;
     commands.push(c);
   }*/
-  
-  target = "@3 t120";
-  commands = MMLScore(target, 0);
-  console.log(commands);
-  //commands.map(c=>{console.log(c);});
+
+  var tokens = [];
+  var str = "@3 t135 o4 L16 ['c+f-a'2,32]4r".toLowerCase();
+  var pos = 0;
+  var cnt = 0; // stopper
+  var result = tokenize(str, pos);
+  while (result.token.type != null){
+    tokens.push(result.token);
+    
+    result = tokenize(str, result.pos);
+    if (++cnt > 50) break;
+  }
+  tokens.map(t=>{ console.log(t); });
   
   return commands;
 };
@@ -399,7 +132,7 @@ function test01_read(){
 
   var m = new MMLTrack2();
   var cmds = m.parse(target);
-  //cmds.map(c=>{console.log(c);});
+  cmds.map(c=>{console.log(c);});
   
   console.log("test01 end.");
 }
@@ -408,8 +141,5 @@ document.getElementById("btnTest").onclick = function(e){
   test01_read();
 };
 
-
 </script>
-
-
 </html>
