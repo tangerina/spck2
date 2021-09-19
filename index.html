@@ -42,7 +42,7 @@ function readdots(str, pos){
   return {val: buf, pos: pos};
 }
 
-var TOKEN_TYPE = {"@":"ToneNo", "t":"Tempo", "o":"Octave", "l":"Length", "r":"Rest", ".": "Dot", 
+var TOKEN_TYPE = {"@":"ToneNo", "t":"Tempo", "o":"Octave", "l":"Length", "r":"Rest", ".": "Dot", "<":"OctUD", ">":"OctUD",
                   "c":"Note", "d":"Note", "e":"Note", "f":"Note", "g":"Note", "a":"Note", "b":"Note", 
                   "+":"Sig", "-":"Sig", "\,":"Comma", "[":"SqbrL", "]":"SqbrR", "'":"Chord", 
                   "1":"Number", "2":"Number", "3":"Number", "4":"Number", "5":"Number", 
@@ -79,6 +79,7 @@ function tokenize(str, pos){
       case "ToneNo":
       case "Tempo":
       case "Octave":
+      case "OctUD":
       case "Length":
       case "Sig":
       case "Comma":
@@ -122,19 +123,38 @@ function constructTree(tokens, tp, tree){
   let rtr = new Tree();
   
   switch (tokens[tp].type){
-    case "SqbrL":// 値をとらないtokenn
+    case "SqbrL":// 値をとらないtoken
     case "ChordL":
+    case "OctUD":
       tr.token = tokens[tp++];
       tr.left = ltr;
       tr.right = rtr;
       tree.right = tr;
       break;
-    case "SqbrR":// 1つの引数を取る可能性がある（?）
+    case "ChordR":
       tr.token = tokens[tp++];
       tr.left = ltr;
       tr.right = rtr;
       tree.right = tr;
-      if (tokens[tp] && tokens[tp].type == "Number"){ // リピート回数があれば、leftのtokenに設定する
+      if (tokens[tp] && tokens[tp].type == "Number"){ // 音長はleft tokenに設定
+        ltr.token = tokens[tp++];
+      }
+      if (tokens[tp] && tokens[tp].type == "Comma"){ // 分散和音
+        tp++;
+        if (tokens[tp] && tokens[tp].type == "Number"){ // latency
+          tr.token.broken = tokens[tp++].val;
+        } else{
+          console.log("constructTree : Syntax error.", tokens[tp]);
+          return;
+        }
+      }
+      break;
+    case "SqbrR":// 1つの引数を取れる
+      tr.token = tokens[tp++];
+      tr.left = ltr;
+      tr.right = rtr;
+      tree.right = tr;
+      if (tokens[tp] && tokens[tp].type == "Number"){ // 繰返し数はleft tokenに設定
         ltr.token = tokens[tp++];
       }
       break;
@@ -144,29 +164,25 @@ function constructTree(tokens, tp, tree){
       tr.right = rtr;
       tree.right = tr;
       if (tokens[tp] && tokens[tp].type == "Sig"){ // 調号
-        // 左に木を追加する？
-        //tokens[tp++];
+        tr.token.sig = tokens[tp++].val;
       }
       if (tokens[tp] && tokens[tp].type == "Number"){ // 音長
-        // 左に木を追加する？
-        //tokens[tp++];
-      }
-      if (tokens[tp] && tokens[tp].type == "Dot"){ // 符点
-        // 左に木を追加する？
-        //tokens[tp++];
+        ltr.token = tokens[tp++];
+        if (tokens[tp] && tokens[tp].type == "Dot"){ // 符点
+          ltr.token.dot = tokens[tp++].val;
+        }
       }
       break;
     case "Number":
       console.log("constructTree : Syntax error.", tokens[tp]);
       return;
-    default:
+    default: // 必ず引数1つを取る
       tr.token = tokens[tp++];
       tr.left = ltr;
       tr.right = rtr;
       tree.right = tr;
       ltr.token = tokens[tp++];    
   }
-  
   constructTree(tokens, tp, tr);
 }
 function printTree(tr, lv){
@@ -181,10 +197,19 @@ function printTree(tr, lv){
       pad += "   ";
     var txt = "  " + pad;
     txt += (tr.token) ? tr.token.val : "";
+    if (tr.token){
+      txt+=(tr.token.sig)?"("+tr.token.sig+")":"";
+      txt+=(tr.token.broken)?"("+tr.token.broken+")":"";
+    }
     txt += "\n" + pad + " / \\\n" + pad;
     txt += (ltr && ltr.token) ? ltr.token.val : "";
+    if (ltr && ltr.token){
+      txt+=(ltr.token.dot)?"("+ltr.token.dot+")":"";
+    }
     console.log(txt);
   }
+  //console.log(tr.token)
+  //if (ltr) console.log(ltr.token)
   
   printTree(rtr, lv+1);
 }
@@ -202,7 +227,8 @@ function parse(mml) {
 
   var tokens = [];
   //var str = "@3 t135 o4 L16 ['c+f-a'2,32]4r".toLowerCase();
-  var str = "t135 c8d2.".toLowerCase();
+  //var str = "t135 'c-2'32,4".toLowerCase();
+  var str = target.toLowerCase();
   var pos = 0;
   var cnt = 0; // stopper
   var result = tokenize(str, pos);
