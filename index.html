@@ -56,7 +56,7 @@ var inchord = 0;
 var CHORD_SUFFIX = ["L", "R"];
 
 function tokenize(str, pos){
-  var token = {type:null, val:null};
+  var token = {type:null,val:null,attr:[]};
   
   while(isws(getch(str, pos))){ pos++; }
   
@@ -142,7 +142,7 @@ function constructTree(tokens, tp, tree){
       if (tokens[tp] && tokens[tp].type == "Comma"){ // 分散和音
         tp++;
         if (tokens[tp] && tokens[tp].type == "Number"){ // latency
-          tr.token.broken = tokens[tp++].val;
+          tr.token.attr.push({broken:tokens[tp++].val});
         } else{
           console.log("constructTree : Syntax error.", tokens[tp]);
           return;
@@ -164,12 +164,12 @@ function constructTree(tokens, tp, tree){
       tr.right = rtr;
       tree.right = tr;
       if (tokens[tp] && tokens[tp].type == "Sig"){ // 調号
-        tr.token.sig = tokens[tp++].val;
+        tr.token.attr.push({sig:tokens[tp++].val});
       }
       if (tokens[tp] && tokens[tp].type == "Number"){ // 音長
         ltr.token = tokens[tp++];
         if (tokens[tp] && tokens[tp].type == "Dot"){ // 符点
-          ltr.token.dot = tokens[tp++].val;
+          ltr.token.attr.push({dot:tokens[tp++].val});
         }
       }
       break;
@@ -197,14 +197,14 @@ function printTree(tr, lv){
       pad += "   ";
     var txt = "  " + pad;
     txt += (tr.token) ? tr.token.val : "";
-    if (tr.token){
-      txt+=(tr.token.sig)?"("+tr.token.sig+")":"";
-      txt+=(tr.token.broken)?"("+tr.token.broken+")":"";
+    if (tr.token.attr.length){
+      txt+=(tr.token.attr[0].sig)?"("+tr.token.attr[0].sig+")":"";
+      txt+=(tr.token.attr[0].broken)?"("+tr.token.attr[0].broken+")":"";
     }
     txt += "\n" + pad + " / \\\n" + pad;
     txt += (ltr && ltr.token) ? ltr.token.val : "";
-    if (ltr && ltr.token){
-      txt+=(ltr.token.dot)?"("+ltr.token.dot+")":"";
+    if (ltr && ltr.token && ltr.token.attr.length){
+      txt+=(ltr.token.attr[0].dot)?"("+ltr.token.attr[0].dot+")":"";
     }
     console.log(txt);
   }
@@ -216,27 +216,17 @@ function printTree(tr, lv){
 
 function parse(mml) {
   var commands = [];
-  /*target = target.toLowerCase();
-  
-  setpos(0);
-  while(getch()){
-    var c = getCmd();
-    if (!c)　break;
-    commands.push(c);
-  }*/
 
   var tokens = [];
   //var str = "@3 t135 o4 L16 ['c+f-a'2,32]4r".toLowerCase();
   //var str = "t135 'c-2'32,4".toLowerCase();
   var str = target.toLowerCase();
-  var pos = 0;
   var cnt = 0; // stopper
-  var result = tokenize(str, pos);
+  var result = tokenize(str, 0);
   while (result.token.type != null){
     tokens.push(result.token);
-    
     result = tokenize(str, result.pos);
-    if (++cnt > 50) break;
+    if (++cnt > 1000) break;
   }
   tokens.map(t=>{ console.log(t); });
   
